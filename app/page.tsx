@@ -10,8 +10,12 @@ import type { GallerySubmission } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 type HomeProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?:
+    | Record<string, string | string[] | undefined>
+    | Promise<Record<string, string | string[] | undefined>>;
 };
+
+type ResolvedSearchParams = Record<string, string | string[] | undefined> | undefined;
 
 const flashMessages = {
   signed_in: {
@@ -36,7 +40,7 @@ const flashMessages = {
   },
 } as const;
 
-function getFlash(searchParams: HomeProps["searchParams"]) {
+function getFlash(searchParams: ResolvedSearchParams) {
   const rawMessage = searchParams?.message;
   const rawError = searchParams?.error;
   const key =
@@ -123,7 +127,8 @@ async function loadGalleryData() {
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const flash = getFlash(searchParams);
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+  const flash = getFlash(resolvedSearchParams);
   const { user, submissions } = await loadGalleryData();
   const profile = user ? getIdentitySnapshot(user) : null;
 

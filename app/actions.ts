@@ -120,7 +120,7 @@ export async function submitArtwork(
 
   const { error: uploadError } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .upload(objectPath, Buffer.from(await image.arrayBuffer()), {
+    .upload(objectPath, await image.arrayBuffer(), {
       contentType: image.type,
       upsert: false,
     });

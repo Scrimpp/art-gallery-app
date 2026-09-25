@@ -24,17 +24,20 @@ create index if not exists submissions_created_at_idx on public.submissions (cre
 alter table public.users enable row level security;
 alter table public.submissions enable row level security;
 
+drop policy if exists "Public can view artists" on public.users;
 create policy "Public can view artists"
 on public.users
 for select
 using (true);
 
+drop policy if exists "Artists can insert own profile" on public.users;
 create policy "Artists can insert own profile"
 on public.users
 for insert
 to authenticated
 with check (auth.uid() = id);
 
+drop policy if exists "Artists can update own profile" on public.users;
 create policy "Artists can update own profile"
 on public.users
 for update
@@ -42,11 +45,13 @@ to authenticated
 using (auth.uid() = id)
 with check (auth.uid() = id);
 
+drop policy if exists "Public can view submissions" on public.submissions;
 create policy "Public can view submissions"
 on public.submissions
 for select
 using (true);
 
+drop policy if exists "Artists can create submissions" on public.submissions;
 create policy "Artists can create submissions"
 on public.submissions
 for insert
@@ -66,11 +71,13 @@ set public = excluded.public,
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists "Public can view gallery images" on storage.objects;
 create policy "Public can view gallery images"
 on storage.objects
 for select
 using (bucket_id = 'art-submissions');
 
+drop policy if exists "Artists can upload own gallery images" on storage.objects;
 create policy "Artists can upload own gallery images"
 on storage.objects
 for insert
@@ -80,6 +87,7 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
+drop policy if exists "Artists can update own gallery images" on storage.objects;
 create policy "Artists can update own gallery images"
 on storage.objects
 for update
@@ -93,6 +101,7 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
+drop policy if exists "Artists can delete own gallery images" on storage.objects;
 create policy "Artists can delete own gallery images"
 on storage.objects
 for delete
