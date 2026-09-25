@@ -3,7 +3,6 @@ const NAVIGATION_CACHE_NAME = "garden-pages-v1";
 const APP_SHELL = [
   "/app-shell.html",
   "/offline.html",
-  "/manifest.webmanifest",
   "/icon.svg",
   "/apple-icon.svg",
   "/icon-192.png",
@@ -57,7 +56,6 @@ self.addEventListener("fetch", (event) => {
 
           if (
             response.ok &&
-            requestUrl.pathname === "/" &&
             !cacheControl.includes("no-store") &&
             !cacheControl.includes("private") &&
             !response.headers.has("set-cookie")

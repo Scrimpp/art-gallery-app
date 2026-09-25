@@ -215,7 +215,6 @@ export async function submitArtwork(
     mood,
     image_url: publicUrlData.publicUrl,
     clean_image_path: cleanObjectPath,
-    mint_fee_cents: DEFAULT_MINT_FEE_CENTS,
   });
 
   if (insertError) {
