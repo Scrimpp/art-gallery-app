@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export function buildRequestOrigin(request: Request) {
   const url = new URL(request.url);
   const forwardedHost = request.headers.get("x-forwarded-host");
@@ -11,6 +13,10 @@ export function buildRequestOrigin(request: Request) {
 }
 
 export function buildOriginFromHeaders(headers: Pick<Headers, "get">) {
+  if (env.siteUrl) {
+    return env.siteUrl;
+  }
+
   const forwardedHost = headers.get("x-forwarded-host") ?? headers.get("host");
   const forwardedProto = headers.get("x-forwarded-proto") ?? "https";
 
@@ -19,6 +25,18 @@ export function buildOriginFromHeaders(headers: Pick<Headers, "get">) {
   }
 
   return `${forwardedProto}://${forwardedHost}`;
+}
+
+export function buildTrustedOrigin(request?: Request) {
+  if (env.siteUrl) {
+    return env.siteUrl;
+  }
+
+  if (request) {
+    return new URL(request.url).origin;
+  }
+
+  return "http://localhost:3000";
 }
 
 export function buildSubmissionUrl(origin: string, submissionId: string) {

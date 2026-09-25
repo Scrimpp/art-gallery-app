@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { buildRequestOrigin } from "@/lib/url";
+import { buildTrustedOrigin } from "@/lib/url";
 import { isSupabaseConfigured } from "@/lib/env";
 
 export async function GET(request: Request) {
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const redirectTo = `${buildRequestOrigin(request)}/auth/callback`;
+  const redirectTo = `${buildTrustedOrigin(request)}/auth/callback`;
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "twitter",
     options: {

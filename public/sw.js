@@ -29,18 +29,31 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    fetch(event.request).catch(async () => {
-      const cachedMatch = await caches.match(event.request);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      try {
+        const response = await fetch(event.request);
 
-      if (cachedMatch) {
-        return cachedMatch;
+        if (
+          response.ok &&
+          event.request.url.startsWith(self.location.origin)
+        ) {
+          cache.put(event.request, response.clone());
+        }
+
+        return response;
+      } catch {
+        const cachedMatch = await cache.match(event.request);
+
+        if (cachedMatch) {
+          return cachedMatch;
+        }
+
+        if (event.request.mode === "navigate") {
+          return cache.match("/");
+        }
+
+        throw new Error("Network unavailable and no cached response was found.");
       }
-
-      if (event.request.mode === "navigate") {
-        return caches.match("/");
-      }
-
-      throw new Error("Network unavailable and no cached response was found.");
     }),
   );
 });

@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { syncUserProfile } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { buildTrustedOrigin } from "@/lib/url";
 
 export async function GET(request: Request) {
+  const appOrigin = buildTrustedOrigin(request);
+
   if (!isSupabaseConfigured) {
     return NextResponse.redirect(
-      new URL("/?error=auth_config_missing", request.url),
+      new URL("/?error=auth_config_missing", appOrigin),
     );
   }
 
@@ -14,21 +17,21 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/?error=oauth_callback_failed", request.url));
+    return NextResponse.redirect(new URL("/?error=oauth_callback_failed", appOrigin));
   }
 
   const supabase = await createServerSupabaseClient();
 
   if (!supabase) {
     return NextResponse.redirect(
-      new URL("/?error=oauth_callback_failed", request.url),
+      new URL("/?error=oauth_callback_failed", appOrigin),
     );
   }
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(new URL("/?error=oauth_callback_failed", request.url));
+    return NextResponse.redirect(new URL("/?error=oauth_callback_failed", appOrigin));
   }
 
   const {
@@ -42,10 +45,10 @@ export async function GET(request: Request) {
       await supabase.auth.signOut();
 
       return NextResponse.redirect(
-        new URL("/?error=profile_sync_failed", request.url),
+        new URL("/?error=profile_sync_failed", appOrigin),
       );
     }
   }
 
-  return NextResponse.redirect(new URL("/?message=signed_in", request.url));
+  return NextResponse.redirect(new URL("/?message=signed_in", appOrigin));
 }

@@ -49,7 +49,7 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 ## Production deployment
 
 1. Deploy the repository to Vercel (or any Next.js-compatible host).
-2. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and optionally `GARDEN_ADMIN_USERNAME` in the hosting dashboard.
+2. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, and optionally `GARDEN_ADMIN_USERNAME` in the hosting dashboard.
 3. In Supabase Auth, add your production callback URL:
 
    ```text
@@ -59,7 +59,7 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 4. If you are using a custom domain such as `garden.neunexart`, point the domain at your hosting provider and add the same callback URL in both:
    - Supabase Auth provider settings
    - Your Twitter/X developer app configuration
-5. Import the GitHub repository into Vercel, set the environment variables above, and redeploy so the PWA manifest and service worker ship with your production build.
+5. Import the GitHub repository into Vercel, set the environment variables above, and redeploy so the PWA manifest, trusted OAuth callback origin, and service worker ship with your production build.
 
 ## Database and storage
 
