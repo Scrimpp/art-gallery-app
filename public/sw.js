@@ -12,13 +12,15 @@ const APP_SHELL = [
 function isCacheableAsset(url) {
   return (
     url.origin === self.location.origin &&
-    (url.pathname.startsWith("/_next/") || APP_SHELL.includes(url.pathname))
+    (url.pathname.startsWith("/_next/static/") || APP_SHELL.includes(url.pathname))
   );
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(APP_SHELL.map((asset) => cache.add(asset))),
+    ),
   );
 });
 

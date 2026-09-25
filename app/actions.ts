@@ -322,9 +322,17 @@ export async function reserveArtwork(
 
   const { data: existingClaim } = await supabase
     .from("submission_claims")
-    .select("status")
+    .select("status, user_id")
     .eq("submission_id", submissionId)
     .maybeSingle();
+
+  if (existingClaim?.user_id && existingClaim.user_id !== user.id) {
+    return {
+      status: "error",
+      message: "This claim is already assigned and cannot be transferred.",
+      downloadUrl: null,
+    };
+  }
 
   const { error: claimError } = await supabase.from("submission_claims").upsert(
     {
