@@ -6,10 +6,13 @@ export const MOODS = [
   "peaceful",
 ] as const;
 
-export const STORAGE_BUCKET = "art-submissions";
+export const PUBLIC_PREVIEW_BUCKET = "art-submissions";
+export const CLEAN_DOWNLOAD_BUCKET = "art-originals";
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 export const MAX_TITLE_LENGTH = 120;
 export const MAX_DESCRIPTION_LENGTH = 500;
+export const MINT_FEE_CENTS = 1200;
+export const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
 export const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",

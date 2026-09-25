@@ -39,10 +39,11 @@ export function SubmissionForm() {
     <section className="rounded-[2rem] border border-[color:var(--border)] bg-black/35 p-6 shadow-2xl shadow-black/20 backdrop-blur">
       <div className="mb-6 space-y-2">
         <p className="text-sm uppercase tracking-[0.3em] text-stone-500">Submission form</p>
-        <h2 className="text-3xl font-semibold text-white">Share what your art says.</h2>
+        <h2 className="text-3xl font-semibold text-white">Share what your Garden piece says.</h2>
         <p className="max-w-2xl text-sm leading-6 text-stone-400">
           Upload a single image, name the piece, and pair it with the feeling it
-          carries beyond language.
+          carries beyond language. Once it goes live, you can claim it for minting
+          and unlock the clean download.
         </p>
       </div>
 
@@ -121,7 +122,7 @@ export function SubmissionForm() {
                   : "text-stone-500"
             }`}
           >
-            {state.message || "Each submission is stored in Supabase and shown newest first."}
+            {state.message || "Each submission is stored as a protected original plus a public watermarked Garden preview."}
           </div>
           <SubmitButton />
         </div>

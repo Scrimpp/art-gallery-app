@@ -1,11 +1,18 @@
+import { headers } from "next/headers";
+import { signOutAction } from "@/app/actions";
 import { GalleryGrid } from "@/components/gallery-grid";
 import { SubmissionForm } from "@/components/submission-form";
 import { TwitterLoginButton } from "@/components/twitter-login-button";
-import { signOutAction } from "@/app/actions";
 import { getIdentitySnapshot } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/env";
+import {
+  CLEAN_DOWNLOAD_BUCKET,
+  MINT_FEE_CENTS,
+  SIGNED_URL_TTL_SECONDS,
+} from "@/lib/constants";
+import { env, isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { GallerySubmission } from "@/lib/types";
+import type { GallerySubmission, TreasurySummary } from "@/lib/types";
+import { buildOriginFromHeaders, buildXShareUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +27,7 @@ type ResolvedSearchParams = Record<string, string | string[] | undefined> | unde
 const flashMessages = {
   signed_in: {
     type: "success",
-    text: "You're signed in with X — your submission form is ready.",
+    text: "You're signed in with X — your Garden submission form is ready.",
   },
   signed_out: {
     type: "success",
@@ -44,6 +51,13 @@ const flashMessages = {
   },
 } as const;
 
+type ClaimRecord = {
+  email: string | null;
+  fee_cents: number | null;
+  status: string | null;
+  submission_id: string;
+};
+
 function getFlash(searchParams: ResolvedSearchParams) {
   const rawMessage = searchParams?.message;
   const rawError = searchParams?.error;
@@ -59,7 +73,32 @@ function getFlash(searchParams: ResolvedSearchParams) {
   return flashMessages[key as keyof typeof flashMessages];
 }
 
-function normalizeSubmissions(data: Array<Record<string, unknown>> | null) {
+function formatUsd(cents: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
+}
+
+function normalizeTreasury(data: Record<string, unknown> | null): TreasurySummary | null {
+  if (!data) {
+    return null;
+  }
+
+  return {
+    totalMints: Number(data.total_mints ?? 0),
+    totalReservations: Number(data.total_reservations ?? 0),
+    revenueCents: Number(data.revenue_cents ?? 0),
+  };
+}
+
+function normalizeSubmissions(
+  data: Array<Record<string, unknown>> | null,
+  claims: Map<string, ClaimRecord>,
+  cleanDownloadUrls: Map<string, string>,
+  currentUserId: string | null,
+  origin: string,
+) {
   if (!data) {
     return [];
   }
@@ -69,14 +108,26 @@ function normalizeSubmissions(data: Array<Record<string, unknown>> | null) {
       entry.user && typeof entry.user === "object"
         ? (entry.user as Record<string, unknown>)
         : null;
+    const submissionId = String(entry.id ?? "");
+    const claim = claims.get(submissionId);
 
     return {
-      id: String(entry.id ?? ""),
+      id: submissionId,
       title: String(entry.title ?? ""),
       description: String(entry.description ?? ""),
       mood: String(entry.mood ?? ""),
       imageUrl: String(entry.image_url ?? ""),
       createdAt: String(entry.created_at ?? ""),
+      userId: String(entry.user_id ?? ""),
+      isOwnedByViewer: currentUserId === String(entry.user_id ?? ""),
+      cleanDownloadUrl: cleanDownloadUrls.get(submissionId) ?? null,
+      claimStatus:
+        claim?.status === "reserved" || claim?.status === "minted"
+          ? claim.status
+          : "none",
+      reservationEmail: claim?.email ?? null,
+      mintFeeCents: Number(entry.mint_fee_cents ?? claim?.fee_cents ?? MINT_FEE_CENTS),
+      xShareUrl: buildXShareUrl(String(entry.title ?? "this piece"), origin, submissionId),
       user: {
         username: String(userRecord?.username ?? "unknown"),
         displayName: String(userRecord?.display_name ?? "Anonymous Artist"),
@@ -89,9 +140,11 @@ function normalizeSubmissions(data: Array<Record<string, unknown>> | null) {
   });
 }
 
-async function loadGalleryData() {
+async function loadGalleryData(origin: string) {
   if (!isSupabaseConfigured) {
     return {
+      profile: null,
+      treasury: null,
       user: null,
       submissions: [] as GallerySubmission[],
     };
@@ -101,30 +154,95 @@ async function loadGalleryData() {
 
   if (!supabase) {
     return {
+      profile: null,
+      treasury: null,
       user: null,
       submissions: [] as GallerySubmission[],
     };
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const profile = user ? getIdentitySnapshot(user) : null;
+  const isAdmin =
+    Boolean(profile?.username) &&
+    Boolean(env.gardenAdminUsername) &&
+    profile?.username.toLowerCase() === env.gardenAdminUsername;
+
   const [
-    {
-      data: { user },
-    },
     { data: submissions },
+    { data: claims },
+    { data: treasury },
   ] = await Promise.all([
-    supabase.auth.getUser(),
     supabase
       .from("submissions")
       .select(
-        "id, title, description, mood, image_url, created_at, user:users!submissions_user_id_fkey!inner(username, display_name, profile_picture_url)",
+        "id, user_id, title, description, mood, image_url, clean_image_path, mint_fee_cents, created_at, user:users!submissions_user_id_fkey!inner(username, display_name, profile_picture_url)",
       )
       .order("created_at", { ascending: false }),
+    user
+      ? supabase
+          .from("submission_claims")
+          .select("submission_id, status, email, fee_cents")
+          .eq("user_id", user.id)
+      : Promise.resolve({ data: null }),
+    isAdmin
+      ? supabase
+          .from("treasury_totals")
+          .select("total_mints, total_reservations, revenue_cents")
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+
+  const claimMap = new Map<string, ClaimRecord>();
+
+  for (const claim of (claims as ClaimRecord[] | null) ?? []) {
+    claimMap.set(String(claim.submission_id), claim);
+  }
+
+  const cleanDownloadUrls = new Map<string, string>();
+
+  if (user && submissions) {
+    const ownedReservedSubmissions = submissions.filter((entry) => {
+      const claim = claimMap.get(String(entry.id ?? ""));
+
+      return (
+        String(entry.user_id ?? "") === user.id &&
+        (claim?.status === "reserved" || claim?.status === "minted") &&
+        typeof entry.clean_image_path === "string" &&
+        entry.clean_image_path
+      );
+    });
+
+    const signedUrls = await Promise.all(
+      ownedReservedSubmissions.map(async (entry) => {
+        const path = String(entry.clean_image_path ?? "");
+        const { data } = await supabase.storage
+          .from(CLEAN_DOWNLOAD_BUCKET)
+          .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+
+        return [String(entry.id ?? ""), data?.signedUrl ?? null] as const;
+      }),
+    );
+
+    for (const [submissionId, signedUrl] of signedUrls) {
+      if (signedUrl) {
+        cleanDownloadUrls.set(submissionId, signedUrl);
+      }
+    }
+  }
 
   return {
     user,
+    profile,
+    treasury: normalizeTreasury(treasury as Record<string, unknown> | null),
     submissions: normalizeSubmissions(
       submissions as Array<Record<string, unknown>> | null,
+      claimMap,
+      cleanDownloadUrls,
+      user?.id ?? null,
+      origin,
     ),
   };
 }
@@ -132,23 +250,25 @@ async function loadGalleryData() {
 export default async function Home({ searchParams }: HomeProps) {
   const resolvedSearchParams = await Promise.resolve(searchParams);
   const flash = getFlash(resolvedSearchParams);
-  const { user, submissions } = await loadGalleryData();
-  const profile = user ? getIdentitySnapshot(user) : null;
+  const headerList = await headers();
+  const origin = buildOriginFromHeaders(headerList);
+  const { user, profile, submissions, treasury } = await loadGalleryData(origin);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-12 px-5 py-8 sm:px-8 lg:px-12">
       <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
         <div className="space-y-6">
           <div className="inline-flex rounded-full border border-[color:var(--border)] bg-[color:var(--accent-soft)] px-4 py-2 text-xs uppercase tracking-[0.35em] text-amber-200/80">
-            Mirror Gallery
+            Garden
           </div>
           <div className="space-y-4">
             <h1 className="max-w-3xl text-4xl font-semibold text-white sm:text-5xl lg:text-6xl">
-              A dark, living gallery for art that says more than words can hold.
+              A dark, living garden for art that says more than words can hold.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-stone-300 sm:text-lg">
-              Sign in with X, upload your work to Supabase storage, and let the
-              newest pieces rise to the top in a minimal masonry gallery.
+              Sign in with X, upload your work to protected Supabase storage, and
+              let the newest pieces bloom to the top with watermarked previews and
+              claim-ready mint access.
             </p>
           </div>
           <div className="grid gap-4 text-sm text-stone-400 sm:grid-cols-3">
@@ -157,12 +277,16 @@ export default async function Home({ searchParams }: HomeProps) {
               <p className="mt-1">Upload limit for JPG, PNG, and GIF artwork.</p>
             </div>
             <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-4">
-              <p className="text-2xl font-semibold text-[color:var(--accent)]">5 moods</p>
-              <p className="mt-1">Ethereal, raw, dark, vibrant, and peaceful.</p>
+              <p className="text-2xl font-semibold text-[color:var(--accent)]">
+              {formatUsd(MINT_FEE_CENTS)}
+              </p>
+              <p className="mt-1">Current Garden mint reservation fee per piece.</p>
             </div>
             <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-4">
-              <p className="text-2xl font-semibold text-[color:var(--accent)]">Supabase</p>
-              <p className="mt-1">Auth, database, and public image delivery.</p>
+              <p className="text-2xl font-semibold text-[color:var(--accent)]">
+                24 hours
+              </p>
+              <p className="mt-1">Signed clean-download access after reservation.</p>
             </div>
           </div>
         </div>
@@ -174,12 +298,12 @@ export default async function Home({ searchParams }: HomeProps) {
             </p>
             <div className="space-y-3">
               <h2 className="text-2xl font-semibold text-white">
-                {user ? `Welcome back, ${profile?.displayName ?? "artist"}.` : "Step into the gallery."}
+                {user ? `Welcome back, ${profile?.displayName ?? "artist"}.` : "Step into Garden."}
               </h2>
               <p className="text-sm leading-6 text-stone-400">
                 {user
-                  ? "Your session is active. Share a new piece below and it will appear in the feed immediately."
-                  : "Connect your X account to unlock submissions and keep your artist identity attached to every piece."}
+                  ? "Your session is active. Share a new piece below, then open its claim flow to reserve the mint and unlock the clean download."
+                  : "Connect your X account to unlock submissions, protected downloads, and future mint reservations."}
               </p>
             </div>
 
@@ -199,7 +323,7 @@ export default async function Home({ searchParams }: HomeProps) {
               <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
                 Add <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
                 <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to enable authentication,
-                uploads, and the live gallery data.
+                uploads, claim reservations, and protected downloads.
               </div>
             ) : user ? (
               <div className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-white/5 p-4">
@@ -238,6 +362,45 @@ export default async function Home({ searchParams }: HomeProps) {
 
       {user ? <SubmissionForm /> : null}
 
+      {treasury ? (
+        <section className="rounded-[2rem] border border-[color:var(--border)] bg-black/35 p-6 shadow-2xl shadow-black/20 backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-stone-500">
+                Admin dashboard
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold text-white">
+                Garden treasury tracking
+              </h2>
+            </div>
+            <p className="max-w-2xl text-sm leading-6 text-stone-400">
+              Track how many pieces have been reserved for minting, how many have
+              been fully minted later, and what that pipeline adds up to.
+            </p>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-5">
+              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">Total mints</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{treasury.totalMints}</p>
+            </div>
+            <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-5">
+              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">
+                Total reservations
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-white">
+                {treasury.totalReservations}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-5">
+              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">Revenue</p>
+              <p className="mt-3 text-3xl font-semibold text-white">
+                {formatUsd(treasury.revenueCents)}
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -245,12 +408,12 @@ export default async function Home({ searchParams }: HomeProps) {
               Latest submissions
             </p>
             <h2 className="mt-2 text-3xl font-semibold text-white">
-              Freshly mirrored artwork
+              Freshly grown artwork
             </h2>
           </div>
           <p className="max-w-xl text-sm leading-6 text-stone-400">
-            The gallery is sorted newest-first and designed to feel quiet, tactile,
-            and intimate on every screen size.
+            Every public card shows a watermarked preview, while creators can claim
+            their own pieces to unlock clean, signed downloads from protected storage.
           </p>
         </div>
         <GalleryGrid submissions={submissions} />

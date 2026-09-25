@@ -1,3 +1,4 @@
+import { ClaimPieceButton } from "@/components/claim-piece-button";
 import { moodStyles } from "@/lib/constants";
 import type { GallerySubmission } from "@/lib/types";
 
@@ -23,13 +24,19 @@ export function GalleryGrid({
       {submissions.map((submission) => (
         <article
           className="mb-6 break-inside-avoid overflow-hidden rounded-[2rem] border border-[color:var(--border)] bg-[color:var(--background-muted)] shadow-xl shadow-black/20"
+          id={`submission-${submission.id}`}
           key={submission.id}
         >
-          <img
-            alt={submission.title}
-            className="h-auto w-full object-cover"
-            src={submission.imageUrl}
-          />
+          <div className="relative">
+            <img
+              alt={submission.title}
+              className="h-auto w-full object-cover"
+              src={submission.imageUrl}
+            />
+            <div className="absolute left-4 top-4 rounded-full border border-[color:var(--border)] bg-black/65 px-3 py-1 text-[11px] uppercase tracking-[0.25em] text-[color:var(--accent)]">
+              Watermarked preview
+            </div>
+          </div>
           <div className="space-y-4 p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -43,6 +50,30 @@ export function GalleryGrid({
               </span>
             </div>
             <p className="text-sm leading-6 text-stone-300">{submission.description}</p>
+            {submission.isOwnedByViewer ? (
+              <div className="rounded-[1.5rem] border border-[color:var(--border)] bg-white/5 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--accent)]">
+                      Artist mint access
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-stone-400">
+                      Reserve to unlock your clean download now, then come back for full wallet minting when Garden turns it on.
+                    </p>
+                  </div>
+                  <ClaimPieceButton
+                    claimStatus={submission.claimStatus}
+                    cleanDownloadUrl={submission.cleanDownloadUrl}
+                    imageUrl={submission.imageUrl}
+                    mintFeeCents={submission.mintFeeCents}
+                    reservationEmail={submission.reservationEmail}
+                    submissionId={submission.id}
+                    title={submission.title}
+                    xShareUrl={submission.xShareUrl}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         </article>
       ))}

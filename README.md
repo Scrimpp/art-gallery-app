@@ -1,4 +1,4 @@
-# Mirror Gallery
+# Garden
 
 A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Supabase, and Twitter/X OAuth.
 
@@ -6,8 +6,12 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 
 - Twitter/X OAuth 2.0 login through Supabase Auth
 - Session-aware submission form for authenticated artists
-- Image uploads to a public Supabase storage bucket
+- Watermarked public previews plus protected clean downloads with 24-hour signed URLs
+- Claim flow for mint reservations with email capture
+- Simple treasury dashboard for tracking reservations, mints, and revenue
 - Responsive masonry gallery sorted newest first
+- Fixed scroll-to-top and scroll-to-bottom controls
+- PWA manifest, installable icons, and offline service worker registration
 - Dark theme with subtle gold accents
 
 ## Tech stack
@@ -34,7 +38,7 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 3. In Supabase:
    - Enable the **Twitter** provider under **Authentication → Providers**
    - Add your local callback URL: `http://localhost:3000/auth/callback`
-   - Create the schema and storage bucket with the SQL in `supabase/migrations/202609251314_create_gallery.sql`
+   - Run the SQL migrations in `supabase/migrations`
 
 4. Start the app:
 
@@ -45,25 +49,29 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 ## Production deployment
 
 1. Deploy the repository to Vercel (or any Next.js-compatible host).
-2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the hosting dashboard.
+2. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and optionally `GARDEN_ADMIN_USERNAME` in the hosting dashboard.
 3. In Supabase Auth, add your production callback URL:
 
    ```text
    https://your-domain.com/auth/callback
    ```
 
-4. If you are using a custom domain such as `mirror.neunexart`, point the domain at your hosting provider and add the same callback URL in both:
+4. If you are using a custom domain such as `garden.neunexart`, point the domain at your hosting provider and add the same callback URL in both:
    - Supabase Auth provider settings
    - Your Twitter/X developer app configuration
+5. Import the GitHub repository into Vercel, set the environment variables above, and redeploy so the PWA manifest and service worker ship with your production build.
 
 ## Database and storage
 
-The migration creates:
+The migrations create:
 
 - `public.users`
 - `public.submissions`
-- public `art-submissions` storage bucket
-- row-level security policies for reading and authenticated inserts
+- `public.submission_claims`
+- `public.treasury_totals`
+- public `art-submissions` preview bucket
+- protected `art-originals` clean-download bucket
+- row-level security policies for submissions, claims, and storage access
 
 ## Scripts
 
