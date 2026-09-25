@@ -72,6 +72,6 @@ export async function syncUserProfile(
       display_name: profile.displayName,
       profile_picture_url: profile.profilePictureUrl,
     },
-    { onConflict: "twitter_id" },
+    { onConflict: "id" },
   );
 }

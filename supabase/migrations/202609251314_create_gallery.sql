@@ -71,14 +71,14 @@ set public = excluded.public,
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
-drop policy if exists "Public can view gallery images" on storage.objects;
-create policy "Public can view gallery images"
+drop policy if exists "Art gallery public can view gallery images" on storage.objects;
+create policy "Art gallery public can view gallery images"
 on storage.objects
 for select
 using (bucket_id = 'art-submissions');
 
-drop policy if exists "Artists can upload own gallery images" on storage.objects;
-create policy "Artists can upload own gallery images"
+drop policy if exists "Art gallery artists can upload own gallery images" on storage.objects;
+create policy "Art gallery artists can upload own gallery images"
 on storage.objects
 for insert
 to authenticated
@@ -87,8 +87,8 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
-drop policy if exists "Artists can update own gallery images" on storage.objects;
-create policy "Artists can update own gallery images"
+drop policy if exists "Art gallery artists can update own gallery images" on storage.objects;
+create policy "Art gallery artists can update own gallery images"
 on storage.objects
 for update
 to authenticated
@@ -101,8 +101,8 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
-drop policy if exists "Artists can delete own gallery images" on storage.objects;
-create policy "Artists can delete own gallery images"
+drop policy if exists "Art gallery artists can delete own gallery images" on storage.objects;
+create policy "Art gallery artists can delete own gallery images"
 on storage.objects
 for delete
 to authenticated
