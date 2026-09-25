@@ -28,9 +28,15 @@ function sanitizeBaseName(value: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-function getFileExtension(file: File) {
-  const extension = file.name.split(".").pop()?.toLowerCase();
-  return extension && extension.length <= 5 ? extension : "jpg";
+function getFileExtension(contentType: string) {
+  switch (contentType) {
+    case "image/png":
+      return "png";
+    case "image/gif":
+      return "gif";
+    default:
+      return "jpg";
+  }
 }
 
 export async function submitArtwork(
@@ -46,7 +52,7 @@ export async function submitArtwork(
     };
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   if (!supabase) {
     return {
@@ -116,11 +122,11 @@ export async function submitArtwork(
     };
   }
 
-  const objectPath = `${user.id}/${Date.now()}-${sanitizeBaseName(image.name) || "artwork"}.${getFileExtension(image)}`;
+  const objectPath = `${user.id}/${Date.now()}-${sanitizeBaseName(image.name) || "artwork"}.${getFileExtension(image.type)}`;
 
   const { error: uploadError } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .upload(objectPath, await image.arrayBuffer(), {
+    .upload(objectPath, image, {
       contentType: image.type,
       upsert: false,
     });
@@ -162,7 +168,7 @@ export async function submitArtwork(
 }
 
 export async function signOutAction() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   if (supabase) {
     await supabase.auth.signOut();

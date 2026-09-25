@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/?error=oauth_callback_failed", request.url));
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   if (!supabase) {
     return NextResponse.redirect(

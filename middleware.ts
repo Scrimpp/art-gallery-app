@@ -18,13 +18,9 @@ export async function middleware(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet, headers) {
+      setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
-        });
-
-        Object.entries(headers).forEach(([key, value]) => {
-          response.headers.set(key, value);
         });
       },
     },
@@ -36,5 +32,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|auth/login|auth/callback).*)"],
 };

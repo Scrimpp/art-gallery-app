@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   if (!supabase) {
     return NextResponse.redirect(

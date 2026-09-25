@@ -61,10 +61,9 @@ function normalizeSubmissions(data: Array<Record<string, unknown>> | null) {
   }
 
   return data.map((entry) => {
-    const userEntry = Array.isArray(entry.user) ? entry.user[0] : entry.user;
     const userRecord =
-      userEntry && typeof userEntry === "object"
-        ? (userEntry as Record<string, unknown>)
+      entry.user && typeof entry.user === "object"
+        ? (entry.user as Record<string, unknown>)
         : null;
 
     return {
@@ -94,7 +93,7 @@ async function loadGalleryData() {
     };
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   if (!supabase) {
     return {
@@ -113,7 +112,7 @@ async function loadGalleryData() {
     supabase
       .from("submissions")
       .select(
-        "id, title, description, mood, image_url, created_at, user:users!submissions_user_id_fkey(username, display_name, profile_picture_url)",
+        "id, title, description, mood, image_url, created_at, user:users!submissions_user_id_fkey!inner(username, display_name, profile_picture_url)",
       )
       .order("created_at", { ascending: false }),
   ]);
