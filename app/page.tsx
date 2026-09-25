@@ -4,11 +4,7 @@ import { GalleryGrid } from "@/components/gallery-grid";
 import { SubmissionForm } from "@/components/submission-form";
 import { TwitterLoginButton } from "@/components/twitter-login-button";
 import { getIdentitySnapshot } from "@/lib/auth";
-import {
-  CLEAN_DOWNLOAD_BUCKET,
-  MINT_FEE_CENTS,
-  SIGNED_URL_TTL_SECONDS,
-} from "@/lib/constants";
+import { MINT_FEE_CENTS } from "@/lib/constants";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { GallerySubmission, TreasurySummary } from "@/lib/types";
@@ -89,6 +85,7 @@ function normalizeTreasury(data: Record<string, unknown> | null): TreasurySummar
     totalMints: Number(data.total_mints ?? 0),
     totalReservations: Number(data.total_reservations ?? 0),
     revenueCents: Number(data.revenue_cents ?? 0),
+    pipelineCents: Number(data.pipeline_cents ?? 0),
   };
 }
 
@@ -190,7 +187,7 @@ async function loadGalleryData(origin: string) {
     isAdmin
       ? supabase
           .from("treasury_totals")
-          .select("total_mints, total_reservations, revenue_cents")
+          .select("total_mints, total_reservations, revenue_cents, pipeline_cents")
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
@@ -201,38 +198,6 @@ async function loadGalleryData(origin: string) {
     claimMap.set(String(claim.submission_id), claim);
   }
 
-  const cleanDownloadUrls = new Map<string, string>();
-
-  if (user && submissions) {
-    const ownedReservedSubmissions = submissions.filter((entry) => {
-      const claim = claimMap.get(String(entry.id ?? ""));
-
-      return (
-        String(entry.user_id ?? "") === user.id &&
-        (claim?.status === "reserved" || claim?.status === "minted") &&
-        typeof entry.clean_image_path === "string" &&
-        entry.clean_image_path
-      );
-    });
-
-    const signedUrls = await Promise.all(
-      ownedReservedSubmissions.map(async (entry) => {
-        const path = String(entry.clean_image_path ?? "");
-        const { data } = await supabase.storage
-          .from(CLEAN_DOWNLOAD_BUCKET)
-          .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
-
-        return [String(entry.id ?? ""), data?.signedUrl ?? null] as const;
-      }),
-    );
-
-    for (const [submissionId, signedUrl] of signedUrls) {
-      if (signedUrl) {
-        cleanDownloadUrls.set(submissionId, signedUrl);
-      }
-    }
-  }
-
   return {
     user,
     profile,
@@ -240,7 +205,7 @@ async function loadGalleryData(origin: string) {
     submissions: normalizeSubmissions(
       submissions as Array<Record<string, unknown>> | null,
       claimMap,
-      cleanDownloadUrls,
+      new Map<string, string>(),
       user?.id ?? null,
       origin,
     ),
@@ -375,7 +340,8 @@ export default async function Home({ searchParams }: HomeProps) {
             </div>
             <p className="max-w-2xl text-sm leading-6 text-stone-400">
               Track how many pieces have been reserved for minting, how many have
-              been fully minted later, and what that pipeline adds up to.
+              been fully minted later, plus both realized revenue and the current
+              reservation pipeline value.
             </p>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -392,11 +358,12 @@ export default async function Home({ searchParams }: HomeProps) {
               </p>
             </div>
             <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-5">
-              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">
-                Revenue pipeline
-              </p>
+              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">Revenue</p>
               <p className="mt-3 text-3xl font-semibold text-white">
                 {formatUsd(treasury.revenueCents)}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-stone-500">
+                Pipeline value {formatUsd(treasury.pipelineCents)}
               </p>
             </div>
           </div>

@@ -47,4 +47,5 @@ export type TreasurySummary = {
   totalMints: number;
   totalReservations: number;
   revenueCents: number;
+  pipelineCents: number;
 };

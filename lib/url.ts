@@ -27,7 +27,57 @@ export function buildOriginFromHeaders(headers: Pick<Headers, "get">) {
   return `${forwardedProto}://${forwardedHost}`;
 }
 
-export function buildTrustedOrigin() {
+function normalizeAllowedHost(value: string) {
+  return value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+function readAllowedAuthHosts() {
+  const hosts = new Set<string>(["localhost:3000", "127.0.0.1:3000"]);
+
+  if (env.siteUrl) {
+    hosts.add(new URL(env.siteUrl).host.toLowerCase());
+  }
+
+  for (const host of env.allowedAuthRedirectHosts.split(",")) {
+    const normalized = normalizeAllowedHost(host);
+
+    if (normalized) {
+      hosts.add(normalized);
+    }
+  }
+
+  return hosts;
+}
+
+function isAllowedAuthHost(host: string, allowedHosts: Set<string>) {
+  const normalizedHost = host.toLowerCase();
+
+  for (const entry of allowedHosts) {
+    if (entry.startsWith("*.") && normalizedHost.endsWith(entry.slice(1))) {
+      return true;
+    }
+
+    if (entry.startsWith(".") && normalizedHost.endsWith(entry)) {
+      return true;
+    }
+
+    if (normalizedHost === entry) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function buildTrustedOrigin(request: Request) {
+  const allowedHosts = readAllowedAuthHosts();
+  const candidateOrigin = buildRequestOrigin(request);
+  const candidateHost = new URL(candidateOrigin).host.toLowerCase();
+
+  if (isAllowedAuthHost(candidateHost, allowedHosts)) {
+    return candidateOrigin;
+  }
+
   if (env.siteUrl) {
     return env.siteUrl;
   }

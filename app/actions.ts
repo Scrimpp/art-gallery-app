@@ -320,13 +320,19 @@ export async function reserveArtwork(
     };
   }
 
+  const { data: existingClaim } = await supabase
+    .from("submission_claims")
+    .select("status")
+    .eq("submission_id", submissionId)
+    .maybeSingle();
+
   const { error: claimError } = await supabase.from("submission_claims").upsert(
     {
       submission_id: submissionId,
       user_id: user.id,
       email,
       fee_cents: MINT_FEE_CENTS,
-      status: "reserved",
+      status: existingClaim?.status === "minted" ? "minted" : "reserved",
     },
     { onConflict: "submission_id" },
   );

@@ -57,7 +57,7 @@ export function ClaimPieceButton({
     }
 
     if (claimStatus === "reserved") {
-      return "Your reservation is active. Update the email below if you want Garden to notify a different inbox.";
+      return "Your reservation is active. Update the email below if you want Garden to notify a different inbox, or resave it to refresh the clean download link.";
     }
 
     if (claimStatus === "minted") {

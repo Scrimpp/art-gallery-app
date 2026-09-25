@@ -36,7 +36,7 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
    ```
 
 3. In Supabase:
-   - Enable the **Twitter** provider under **Authentication → Providers**
+   - Enable the **Twitter** provider under **Authentication → Providers** (Supabase still labels the X login provider as `twitter`)
    - Add your local callback URL: `http://localhost:3000/auth/callback`
    - Run the SQL migrations in `supabase/migrations`
 
@@ -49,7 +49,7 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 ## Production deployment
 
 1. Deploy the repository to Vercel (or any Next.js-compatible host).
-2. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, and optionally `GARDEN_ADMIN_USERNAME` in the hosting dashboard.
+2. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `ALLOWED_AUTH_REDIRECT_HOSTS`, and optionally `GARDEN_ADMIN_USERNAME` in the hosting dashboard.
 3. In Supabase Auth, add your production callback URL:
 
    ```text

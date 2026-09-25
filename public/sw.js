@@ -1,5 +1,6 @@
 const CACHE_NAME = "garden-shell-v1";
 const APP_SHELL = [
+  "/app-shell.html",
   "/offline.html",
   "/manifest.webmanifest",
   "/icon.svg",
@@ -46,7 +47,15 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("/offline.html")),
+      fetch(event.request).catch(async () => {
+        const appShell = await caches.match("/app-shell.html");
+
+        if (appShell) {
+          return appShell;
+        }
+
+        return caches.match("/offline.html");
+      }),
     );
 
     return;
