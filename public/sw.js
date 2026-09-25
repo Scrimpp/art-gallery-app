@@ -97,13 +97,21 @@ self.addEventListener("fetch", (event) => {
         return cachedMatch;
       }
 
-      const response = await fetch(event.request);
+      try {
+        const response = await fetch(event.request);
 
-      if (response.ok) {
-        cache.put(event.request, response.clone());
+        if (response.ok) {
+          cache.put(event.request, response.clone());
+        }
+
+        return response;
+      } catch (error) {
+        if (cachedMatch) {
+          return cachedMatch;
+        }
+
+        throw error;
       }
-
-      return response;
     }),
   );
 });

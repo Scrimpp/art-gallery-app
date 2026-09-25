@@ -208,14 +208,17 @@ export async function submitArtwork(
     .from(PUBLIC_PREVIEW_BUCKET)
     .getPublicUrl(previewObjectPath);
 
-  const { error: insertError } = await supabase.from("submissions").insert({
-    user_id: user.id,
-    title,
-    description,
-    mood,
-    image_url: publicUrlData.publicUrl,
-    clean_image_path: cleanObjectPath,
-  });
+  const { data: insertedSubmission, error: insertError } = await supabase
+    .from("submissions")
+    .insert({
+      user_id: user.id,
+      title,
+      description,
+      mood,
+      image_url: publicUrlData.publicUrl,
+    })
+    .select("id")
+    .single();
 
   if (insertError) {
     await Promise.all([
@@ -226,6 +229,24 @@ export async function submitArtwork(
     return {
       status: "error",
       message: "Your artwork was uploaded, but the gallery entry could not be saved.",
+    };
+  }
+
+  const { error: assetInsertError } = await supabase.from("submission_assets").insert({
+    submission_id: insertedSubmission.id,
+    clean_image_path: cleanObjectPath,
+  });
+
+  if (assetInsertError) {
+    await Promise.all([
+      supabase.from("submissions").delete().eq("id", insertedSubmission.id),
+      supabase.storage.from(PUBLIC_PREVIEW_BUCKET).remove([previewObjectPath]),
+      supabase.storage.from(CLEAN_DOWNLOAD_BUCKET).remove([cleanObjectPath]),
+    ]);
+
+    return {
+      status: "error",
+      message: "Your artwork was uploaded, but the protected download could not be linked.",
     };
   }
 
@@ -299,7 +320,7 @@ export async function reserveArtwork(
 
   const { data: submission, error: submissionError } = await supabase
     .from("submissions")
-    .select("id, user_id, clean_image_path, mint_fee_cents")
+    .select("id, user_id, mint_fee_cents")
     .eq("id", submissionId)
     .maybeSingle();
 
@@ -319,32 +340,21 @@ export async function reserveArtwork(
     };
   }
 
-  const { data: existingClaim } = await supabase
-    .from("submission_claims")
-    .select("status, user_id")
-    .eq("submission_id", submissionId)
-    .maybeSingle();
-
-  if (existingClaim?.user_id && existingClaim.user_id !== user.id) {
-    return {
-      status: "error",
-      message: "This claim is already assigned and cannot be transferred.",
-      downloadUrl: null,
-    };
-  }
-
-  const { error: claimError } = await supabase.from("submission_claims").upsert(
-    {
-      submission_id: submissionId,
-      user_id: user.id,
-      email,
-      fee_cents: Number(submission.mint_fee_cents ?? DEFAULT_MINT_FEE_CENTS),
-      status: existingClaim?.status === "minted" ? "minted" : "reserved",
-    },
-    { onConflict: "submission_id" },
-  );
+  const { error: claimError } = await supabase.rpc("reserve_submission_claim", {
+    target_submission_id: submissionId,
+    claim_email: email,
+    claim_fee_cents: Number(submission.mint_fee_cents ?? DEFAULT_MINT_FEE_CENTS),
+  });
 
   if (claimError) {
+    if (claimError.message.includes("CLAIM_ALREADY_ASSIGNED")) {
+      return {
+        status: "error",
+        message: "This claim is already assigned and cannot be transferred.",
+        downloadUrl: null,
+      };
+    }
+
     return {
       status: "error",
       message: "We couldn't save your reservation right now. Please try again.",
@@ -356,10 +366,19 @@ export async function reserveArtwork(
   let message =
     "Reserved. We'll email you when wallet minting goes live, and your clean download is unlocked for the next 24 hours.";
 
-  if (typeof submission.clean_image_path === "string" && submission.clean_image_path) {
+  const { data: submissionAsset } = await supabase
+    .from("submission_assets")
+    .select("clean_image_path")
+    .eq("submission_id", submissionId)
+    .maybeSingle();
+
+  if (
+    typeof submissionAsset?.clean_image_path === "string" &&
+    submissionAsset.clean_image_path
+  ) {
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(CLEAN_DOWNLOAD_BUCKET)
-      .createSignedUrl(submission.clean_image_path, 60 * 60 * 24);
+      .createSignedUrl(submissionAsset.clean_image_path, 60 * 60 * 24);
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
       message =

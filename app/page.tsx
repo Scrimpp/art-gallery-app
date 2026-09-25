@@ -63,6 +63,11 @@ type ClaimRecord = {
   submission_id: string;
 };
 
+type SubmissionAssetRecord = {
+  clean_image_path: string;
+  submission_id: string;
+};
+
 function getFlash(searchParams: ResolvedSearchParams) {
   const rawMessage = searchParams?.message;
   const rawError = searchParams?.error;
@@ -179,7 +184,7 @@ async function loadGalleryData(origin: string) {
     supabase
       .from("submissions")
       .select(
-        "id, user_id, title, description, mood, image_url, clean_image_path, mint_fee_cents, created_at, user:users!submissions_user_id_fkey!inner(username, display_name, profile_picture_url)",
+        "id, user_id, title, description, mood, image_url, mint_fee_cents, created_at, user:users!submissions_user_id_fkey!inner(username, display_name, profile_picture_url)",
       )
       .order("created_at", { ascending: false }),
     user
@@ -211,21 +216,59 @@ async function loadGalleryData(origin: string) {
       return (
         String(entry.user_id ?? "") === user.id &&
         (claim?.status === "reserved" || claim?.status === "minted") &&
-        typeof entry.clean_image_path === "string" &&
-        entry.clean_image_path
+        true
       );
     });
 
     if (ownedClaimedSubmissions.length > 0) {
+      const { data: submissionAssets } = await supabase
+        .from("submission_assets")
+        .select("submission_id, clean_image_path")
+        .in(
+          "submission_id",
+          ownedClaimedSubmissions.map((entry) => String(entry.id ?? "")),
+        );
+
+      const assetPathBySubmissionId = new Map<string, string>();
+
+      for (const asset of (submissionAssets as SubmissionAssetRecord[] | null) ?? []) {
+        assetPathBySubmissionId.set(
+          String(asset.submission_id),
+          String(asset.clean_image_path),
+        );
+      }
+
+      const signablePaths = ownedClaimedSubmissions
+        .map((entry) => ({
+          submissionId: String(entry.id ?? ""),
+          path: assetPathBySubmissionId.get(String(entry.id ?? "")) ?? "",
+        }))
+        .filter((entry) => entry.path);
+
+      if (signablePaths.length === 0) {
+        return {
+          user,
+          profile,
+          treasury: normalizeTreasury(treasury as Record<string, unknown> | null),
+          submissions: normalizeSubmissions(
+            submissions as Array<Record<string, unknown>> | null,
+            claimMap,
+            cleanDownloadUrls,
+            user?.id ?? null,
+            origin,
+          ),
+        };
+      }
+
       const { data: signedUrls } = await supabase.storage
         .from(CLEAN_DOWNLOAD_BUCKET)
         .createSignedUrls(
-          ownedClaimedSubmissions.map((entry) => String(entry.clean_image_path ?? "")),
+          signablePaths.map((entry) => entry.path),
           SIGNED_URL_TTL_SECONDS,
         );
 
       signedUrls?.forEach((entry, index) => {
-        const submissionId = String(ownedClaimedSubmissions[index]?.id ?? "");
+        const submissionId = signablePaths[index]?.submissionId ?? "";
 
         if (submissionId && entry?.signedUrl) {
           cleanDownloadUrls.set(submissionId, entry.signedUrl);
