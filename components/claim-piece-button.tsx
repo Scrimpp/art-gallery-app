@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { reserveArtwork } from "@/app/actions";
+import { calculateProceedsBreakdown, formatUsd } from "@/lib/treasury";
 import { type ClaimStatus, initialClaimState } from "@/lib/types";
 
 function ReserveButton({ claimed }: { claimed: boolean }) {
@@ -30,13 +31,6 @@ type ClaimPieceButtonProps = {
   xShareUrl: string;
 };
 
-function formatUsd(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
-
 export function ClaimPieceButton({
   claimStatus,
   cleanDownloadUrl,
@@ -51,6 +45,11 @@ export function ClaimPieceButton({
   const [state, formAction] = useFormState(reserveArtwork, initialClaimState);
   const isClaimed = claimStatus !== "none" || state.status === "success";
   const resolvedDownloadUrl = state.downloadUrl ?? cleanDownloadUrl;
+  const proceedsBreakdown = useMemo(
+    () => calculateProceedsBreakdown(mintFeeCents),
+    [mintFeeCents],
+  );
+  const artistPayout = proceedsBreakdown.find((entry) => entry.key === "artist");
   const helperText = useMemo(() => {
     if (state.message) {
       return state.message;
@@ -115,6 +114,40 @@ export function ClaimPieceButton({
                   </div>
                   <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-4 text-sm leading-6 text-stone-300">
                     Once the full wallet flow launches, Garden will turn this reservation into a proper mint queue entry and notify you using the email you leave below.
+                  </div>
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-stone-500">
+                      Mint proceeds
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-white">
+                      Artist payout {formatUsd(artistPayout?.amountCents ?? 0)}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-stone-400">
+                      Transparent split for this mint fee before any full wallet mint goes live.
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      {proceedsBreakdown.map((entry) => (
+                        <div
+                          className="flex items-start justify-between gap-3 text-sm"
+                          key={entry.key}
+                        >
+                          <div>
+                            <p className="font-medium text-stone-100">{entry.label}</p>
+                            <p className="text-xs leading-5 text-stone-500">
+                              {entry.description}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-white">
+                              {formatUsd(entry.amountCents)}
+                            </p>
+                            <p className="text-xs text-[color:var(--accent)]">
+                              {entry.percentageLabel}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -9,12 +9,12 @@ import {
   MAX_DESCRIPTION_LENGTH,
   MAX_FILE_SIZE,
   MAX_TITLE_LENGTH,
-  MINT_FEE_CENTS,
   MOODS,
   PUBLIC_PREVIEW_BUCKET,
 } from "@/lib/constants";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { DEFAULT_MINT_FEE_CENTS } from "@/lib/treasury";
 import {
   type ClaimState,
   type SubmissionState,
@@ -215,7 +215,7 @@ export async function submitArtwork(
     mood,
     image_url: publicUrlData.publicUrl,
     clean_image_path: cleanObjectPath,
-    mint_fee_cents: MINT_FEE_CENTS,
+    mint_fee_cents: DEFAULT_MINT_FEE_CENTS,
   });
 
   if (insertError) {
@@ -339,7 +339,7 @@ export async function reserveArtwork(
       submission_id: submissionId,
       user_id: user.id,
       email,
-      fee_cents: MINT_FEE_CENTS,
+      fee_cents: DEFAULT_MINT_FEE_CENTS,
       status: existingClaim?.status === "minted" ? "minted" : "reserved",
     },
     { onConflict: "submission_id" },

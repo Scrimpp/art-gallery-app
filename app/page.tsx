@@ -6,11 +6,16 @@ import { TwitterLoginButton } from "@/components/twitter-login-button";
 import { getIdentitySnapshot } from "@/lib/auth";
 import {
   CLEAN_DOWNLOAD_BUCKET,
-  MINT_FEE_CENTS,
   SIGNED_URL_TTL_SECONDS,
 } from "@/lib/constants";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  DEFAULT_MINT_FEE_CENTS,
+  calculateProceedsBreakdown,
+  formatMintFeeRange,
+  formatUsd,
+} from "@/lib/treasury";
 import type { GallerySubmission, TreasurySummary } from "@/lib/types";
 import { buildOriginFromHeaders, buildXShareUrl } from "@/lib/url";
 
@@ -73,13 +78,6 @@ function getFlash(searchParams: ResolvedSearchParams) {
   return flashMessages[key as keyof typeof flashMessages];
 }
 
-function formatUsd(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
-
 function normalizeTreasury(data: Record<string, unknown> | null): TreasurySummary | null {
   if (!data) {
     return null;
@@ -127,7 +125,9 @@ function normalizeSubmissions(
           ? claim.status
           : "none",
       reservationEmail: claim?.email ?? null,
-      mintFeeCents: Number(entry.mint_fee_cents ?? claim?.fee_cents ?? MINT_FEE_CENTS),
+      mintFeeCents: Number(
+        entry.mint_fee_cents ?? claim?.fee_cents ?? DEFAULT_MINT_FEE_CENTS,
+      ),
       xShareUrl: buildXShareUrl(String(entry.title ?? "this piece"), origin, submissionId),
       user: {
         username: String(userRecord?.username ?? "unknown"),
@@ -254,6 +254,12 @@ export default async function Home({ searchParams }: HomeProps) {
   const headerList = await headers();
   const origin = buildOriginFromHeaders(headerList);
   const { user, profile, submissions, treasury } = await loadGalleryData(origin);
+  const realizedBreakdown = treasury
+    ? calculateProceedsBreakdown(treasury.revenueCents)
+    : [];
+  const pipelineBreakdown = treasury
+    ? calculateProceedsBreakdown(treasury.pipelineCents)
+    : [];
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-12 px-5 py-8 sm:px-8 lg:px-12">
@@ -279,9 +285,11 @@ export default async function Home({ searchParams }: HomeProps) {
             </div>
             <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-4">
               <p className="text-2xl font-semibold text-[color:var(--accent)]">
-              {formatUsd(MINT_FEE_CENTS)}
+                {formatMintFeeRange()}
               </p>
-              <p className="mt-1">Current Garden mint reservation fee per piece.</p>
+              <p className="mt-1">
+                Garden mint target range, with each piece storing its own configured fee.
+              </p>
             </div>
             <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-4">
               <p className="text-2xl font-semibold text-[color:var(--accent)]">
@@ -401,6 +409,55 @@ export default async function Home({ searchParams }: HomeProps) {
               <p className="mt-2 text-xs leading-5 text-stone-500">
                 Pipeline value {formatUsd(treasury.pipelineCents)}
               </p>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-5">
+              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">
+                Mint proceeds policy
+              </p>
+              <h3 className="mt-3 text-2xl font-semibold text-white">
+                Transparent splits on every Garden mint
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-stone-400">
+                Every mint routes 40% directly to the original artist, with the
+                remaining 60% split across the Garden treasury, liquidity, curation
+                rewards, and platform maintenance.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {realizedBreakdown.map((split, index) => (
+                <div
+                  className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-5"
+                  key={split.key}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-white">{split.label}</p>
+                      <p className="mt-1 text-sm leading-5 text-stone-400">
+                        {split.description}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-[color:var(--accent)]">
+                      {split.percentageLabel}
+                    </p>
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3 text-stone-300">
+                      <span>Realized</span>
+                      <span className="font-medium text-white">
+                        {formatUsd(split.amountCents)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-stone-400">
+                      <span>Pipeline</span>
+                      <span className="font-medium text-stone-200">
+                        {formatUsd(pipelineBreakdown[index]?.amountCents ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

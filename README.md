@@ -8,7 +8,7 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 - Session-aware submission form for authenticated artists
 - Watermarked public previews plus protected clean downloads with 24-hour signed URLs
 - Claim flow for mint reservations with email capture
-- Simple treasury dashboard for tracking reservations, mints, and revenue
+- Transparent treasury dashboard for tracking reservations, mints, revenue, and configured proceeds splits
 - Responsive masonry gallery sorted newest first
 - Fixed scroll-to-top and scroll-to-bottom controls
 - PWA manifest, installable icons, and offline service worker registration
@@ -48,18 +48,38 @@ A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Su
 
 ## Production deployment
 
-1. Deploy the repository to Vercel (or any Next.js-compatible host).
-2. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `ALLOWED_AUTH_REDIRECT_HOSTS`, and optionally `GARDEN_ADMIN_USERNAME` in the hosting dashboard.
-3. In Supabase Auth, add your production callback URL:
+1. Import the GitHub repository into Vercel and deploy the current Garden project.
+2. In **Vercel → Project → Settings → Domains**, remove any stale connections for `neunex.art` and `mirror-neunex.art`.
+3. Re-add both domains to this project so they resolve to the current deployment at `mirror-lkt24ppt2-scrimpps-projects.vercel.app`.
+4. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `ALLOWED_AUTH_REDIRECT_HOSTS`, and optionally `GARDEN_ADMIN_USERNAME` in the Vercel environment settings with values like:
 
    ```text
-   https://your-domain.com/auth/callback
+   NEXT_PUBLIC_SITE_URL=https://neunex.art
+   ALLOWED_AUTH_REDIRECT_HOSTS=neunex.art,mirror-neunex.art,mirror-lkt24ppt2-scrimpps-projects.vercel.app
    ```
 
-4. If you are using a custom domain such as `garden.neunexart`, point the domain at your hosting provider and add the same callback URL in both:
-   - Supabase Auth provider settings
-   - Your Twitter/X developer app configuration
-5. Import the GitHub repository into Vercel, set the environment variables above, and redeploy so the PWA manifest, trusted OAuth callback origin, and service worker ship with your production build.
+5. In Supabase Auth, add your production callback URLs:
+
+   ```text
+   https://neunex.art/auth/callback
+   https://mirror-neunex.art/auth/callback
+   https://mirror-lkt24ppt2-scrimpps-projects.vercel.app/auth/callback
+   ```
+
+6. Add the same callback URLs in your Twitter/X developer app configuration.
+7. Redeploy after the domain updates so the PWA manifest, trusted OAuth callback origin, and service worker all ship with the latest production configuration.
+
+## Mint proceeds configuration
+
+Garden keeps the mint breakdown transparent for artists and admins:
+
+- 40% → Original artist / creator
+- 25% → Garden ecosystem treasury
+- 20% → Liquidity pool
+- 10% → Curation rewards
+- 5% → Platform maintenance
+
+The default Garden mint target range is `$20–$50`, and the current default mint fee starts at `$20.00`. Update `lib/treasury.ts` if you need to change the default mint pricing or the split percentages.
 
 ## Database and storage
 
