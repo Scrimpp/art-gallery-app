@@ -300,7 +300,7 @@ export async function reserveArtwork(
 
   const { data: submission, error: submissionError } = await supabase
     .from("submissions")
-    .select("id, user_id, clean_image_path")
+    .select("id, user_id, clean_image_path, mint_fee_cents")
     .eq("id", submissionId)
     .maybeSingle();
 
@@ -339,7 +339,7 @@ export async function reserveArtwork(
       submission_id: submissionId,
       user_id: user.id,
       email,
-      fee_cents: DEFAULT_MINT_FEE_CENTS,
+      fee_cents: Number(submission.mint_fee_cents ?? DEFAULT_MINT_FEE_CENTS),
       status: existingClaim?.status === "minted" ? "minted" : "reserved",
     },
     { onConflict: "submission_id" },
