@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NetworkStatusAnnouncer } from "@/components/network-status-announcer";
 import { ScrollControls } from "@/components/scroll-controls";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import "./globals.css";
@@ -28,6 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <NetworkStatusAnnouncer />
         {children}
         <ScrollControls />
         <ServiceWorkerRegistration />
