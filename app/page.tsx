@@ -4,7 +4,11 @@ import { GalleryGrid } from "@/components/gallery-grid";
 import { SubmissionForm } from "@/components/submission-form";
 import { TwitterLoginButton } from "@/components/twitter-login-button";
 import { getIdentitySnapshot } from "@/lib/auth";
-import { MINT_FEE_CENTS } from "@/lib/constants";
+import {
+  CLEAN_DOWNLOAD_BUCKET,
+  MINT_FEE_CENTS,
+  SIGNED_URL_TTL_SECONDS,
+} from "@/lib/constants";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { GallerySubmission, TreasurySummary } from "@/lib/types";
@@ -198,6 +202,38 @@ async function loadGalleryData(origin: string) {
     claimMap.set(String(claim.submission_id), claim);
   }
 
+  const cleanDownloadUrls = new Map<string, string>();
+
+  if (user && submissions) {
+    const ownedClaimedSubmissions = submissions.filter((entry) => {
+      const claim = claimMap.get(String(entry.id ?? ""));
+
+      return (
+        String(entry.user_id ?? "") === user.id &&
+        (claim?.status === "reserved" || claim?.status === "minted") &&
+        typeof entry.clean_image_path === "string" &&
+        entry.clean_image_path
+      );
+    });
+
+    if (ownedClaimedSubmissions.length > 0) {
+      const { data: signedUrls } = await supabase.storage
+        .from(CLEAN_DOWNLOAD_BUCKET)
+        .createSignedUrls(
+          ownedClaimedSubmissions.map((entry) => String(entry.clean_image_path ?? "")),
+          SIGNED_URL_TTL_SECONDS,
+        );
+
+      signedUrls?.forEach((entry, index) => {
+        const submissionId = String(ownedClaimedSubmissions[index]?.id ?? "");
+
+        if (submissionId && entry?.signedUrl) {
+          cleanDownloadUrls.set(submissionId, entry.signedUrl);
+        }
+      });
+    }
+  }
+
   return {
     user,
     profile,
@@ -205,7 +241,7 @@ async function loadGalleryData(origin: string) {
     submissions: normalizeSubmissions(
       submissions as Array<Record<string, unknown>> | null,
       claimMap,
-      new Map<string, string>(),
+      cleanDownloadUrls,
       user?.id ?? null,
       origin,
     ),

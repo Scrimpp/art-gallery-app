@@ -113,7 +113,7 @@ begin
     count(*) filter (where status = 'minted'),
     count(*) filter (where status = 'reserved'),
     coalesce(sum(fee_cents) filter (where status = 'minted'), 0),
-    coalesce(sum(fee_cents), 0),
+    coalesce(sum(fee_cents) filter (where status = 'reserved'), 0),
     timezone('utc', now())
   from public.submission_claims
   on conflict (id) do update

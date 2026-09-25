@@ -1,4 +1,5 @@
 const CACHE_NAME = "garden-shell-v1";
+const NAVIGATION_CACHE_NAME = "garden-pages-v1";
 const APP_SHELL = [
   "/app-shell.html",
   "/offline.html",
@@ -49,14 +50,37 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(async () => {
-        const appShell = await caches.match("/app-shell.html");
+      caches.open(NAVIGATION_CACHE_NAME).then(async (cache) => {
+        try {
+          const response = await fetch(event.request);
+          const cacheControl = response.headers.get("cache-control") ?? "";
 
-        if (appShell) {
-          return appShell;
+          if (
+            response.ok &&
+            requestUrl.pathname === "/" &&
+            !cacheControl.includes("no-store") &&
+            !cacheControl.includes("private") &&
+            !response.headers.has("set-cookie")
+          ) {
+            cache.put(event.request, response.clone());
+          }
+
+          return response;
+        } catch {
+          const cachedPage = await cache.match(event.request);
+
+          if (cachedPage) {
+            return cachedPage;
+          }
+
+          const appShell = await caches.match("/app-shell.html");
+
+          if (appShell) {
+            return appShell;
+          }
+
+          return caches.match("/offline.html");
         }
-
-        return caches.match("/offline.html");
       }),
     );
 

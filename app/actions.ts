@@ -354,21 +354,27 @@ export async function reserveArtwork(
   }
 
   let downloadUrl: string | null = null;
+  let message =
+    "Reserved. We'll email you when wallet minting goes live, and your clean download is unlocked for the next 24 hours.";
 
   if (typeof submission.clean_image_path === "string" && submission.clean_image_path) {
-    const { data: signedUrlData } = await supabase.storage
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(CLEAN_DOWNLOAD_BUCKET)
       .createSignedUrl(submission.clean_image_path, 60 * 60 * 24);
 
-    downloadUrl = signedUrlData?.signedUrl ?? null;
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      message =
+        "Reserved. We'll email you when wallet minting goes live, but we couldn't generate the clean download link just yet.";
+    } else {
+      downloadUrl = signedUrlData.signedUrl;
+    }
   }
 
   revalidatePath("/");
 
   return {
     status: "success",
-    message:
-      "Reserved. We'll email you when wallet minting goes live, and your clean download is unlocked for the next 24 hours.",
+    message,
     downloadUrl,
   };
 }
