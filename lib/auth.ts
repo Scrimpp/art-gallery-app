@@ -61,10 +61,10 @@ export async function syncUserProfile(
   const profile = getIdentitySnapshot(user);
 
   if (!profile.twitterId) {
-    return;
+    return new Error("Twitter identity information is missing.");
   }
 
-  await supabase.from("users").upsert(
+  const { error } = await supabase.from("users").upsert(
     {
       id: user.id,
       twitter_id: profile.twitterId,
@@ -74,4 +74,6 @@ export async function syncUserProfile(
     },
     { onConflict: "id" },
   );
+
+  return error;
 }

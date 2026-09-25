@@ -38,6 +38,10 @@ const flashMessages = {
     type: "error",
     text: "The X login callback failed. Verify your redirect URLs in Supabase and the X developer portal.",
   },
+  profile_sync_failed: {
+    type: "error",
+    text: "Your X account signed in, but the artist profile could not be saved. Try the login flow again after checking your Supabase schema.",
+  },
 } as const;
 
 function getFlash(searchParams: ResolvedSearchParams) {

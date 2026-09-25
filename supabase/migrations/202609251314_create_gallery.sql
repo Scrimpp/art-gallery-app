@@ -3,7 +3,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.users (
   id uuid primary key references auth.users (id) on delete cascade,
   twitter_id text not null unique,
-  username text not null unique,
+  username text not null,
   display_name text not null,
   profile_picture_url text,
   created_at timestamptz not null default timezone('utc', now())
@@ -82,20 +82,6 @@ create policy "Art gallery artists can upload own gallery images"
 on storage.objects
 for insert
 to authenticated
-with check (
-  bucket_id = 'art-submissions'
-  and (storage.foldername(name))[1] = auth.uid()::text
-);
-
-drop policy if exists "Art gallery artists can update own gallery images" on storage.objects;
-create policy "Art gallery artists can update own gallery images"
-on storage.objects
-for update
-to authenticated
-using (
-  bucket_id = 'art-submissions'
-  and (storage.foldername(name))[1] = auth.uid()::text
-)
 with check (
   bucket_id = 'art-submissions'
   and (storage.foldername(name))[1] = auth.uid()::text

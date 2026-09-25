@@ -73,7 +73,14 @@ export async function submitArtwork(
     };
   }
 
-  await syncUserProfile(supabase, user);
+  const syncError = await syncUserProfile(supabase, user);
+
+  if (syncError) {
+    return {
+      status: "error",
+      message: "We couldn't prepare your artist profile. Reconnect with X and try again.",
+    };
+  }
 
   const title = formData.get("title")?.toString().trim() ?? "";
   const description = formData.get("description")?.toString().trim() ?? "";

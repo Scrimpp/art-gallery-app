@@ -36,7 +36,15 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (user) {
-    await syncUserProfile(supabase, user);
+    const syncError = await syncUserProfile(supabase, user);
+
+    if (syncError) {
+      await supabase.auth.signOut();
+
+      return NextResponse.redirect(
+        new URL("/?error=profile_sync_failed", request.url),
+      );
+    }
   }
 
   return NextResponse.redirect(new URL("/?message=signed_in", request.url));
