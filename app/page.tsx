@@ -392,7 +392,9 @@ export default async function Home({ searchParams }: HomeProps) {
               </p>
             </div>
             <div className="rounded-2xl border border-[color:var(--border)] bg-white/5 p-5">
-              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">Revenue</p>
+              <p className="text-sm uppercase tracking-[0.25em] text-stone-500">
+                Revenue pipeline
+              </p>
               <p className="mt-3 text-3xl font-semibold text-white">
                 {formatUsd(treasury.revenueCents)}
               </p>

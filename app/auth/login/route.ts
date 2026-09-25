@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const redirectTo = `${buildTrustedOrigin(request)}/auth/callback`;
+  const redirectTo = `${buildTrustedOrigin()}/auth/callback`;
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "twitter",
     options: {

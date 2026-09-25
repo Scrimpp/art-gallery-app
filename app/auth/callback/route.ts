@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { buildTrustedOrigin } from "@/lib/url";
 
 export async function GET(request: Request) {
-  const appOrigin = buildTrustedOrigin(request);
+  const appOrigin = buildTrustedOrigin();
 
   if (!isSupabaseConfigured) {
     return NextResponse.redirect(

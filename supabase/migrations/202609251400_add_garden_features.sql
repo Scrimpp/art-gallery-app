@@ -44,7 +44,7 @@ create or replace view public.treasury_totals as
 select
   count(*) filter (where status = 'minted') as total_mints,
   count(*) filter (where status = 'reserved') as total_reservations,
-  coalesce(sum(fee_cents) filter (where status = 'minted'), 0) as revenue_cents
+  coalesce(sum(fee_cents), 0) as revenue_cents
 from public.submission_claims;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

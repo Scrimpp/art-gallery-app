@@ -27,13 +27,9 @@ export function buildOriginFromHeaders(headers: Pick<Headers, "get">) {
   return `${forwardedProto}://${forwardedHost}`;
 }
 
-export function buildTrustedOrigin(request?: Request) {
+export function buildTrustedOrigin() {
   if (env.siteUrl) {
     return env.siteUrl;
-  }
-
-  if (request) {
-    return new URL(request.url).origin;
   }
 
   return "http://localhost:3000";
