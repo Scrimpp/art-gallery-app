@@ -1,6 +1,6 @@
 # Mirror Gallery
 
-A full-stack art gallery web application built with Next.js 14, Tailwind CSS, Supabase, and Twitter/X OAuth.
+A full-stack art gallery web application built with Next.js 16, Tailwind CSS, Supabase, and Twitter/X OAuth.
 
 ## Features
 
@@ -12,7 +12,7 @@ A full-stack art gallery web application built with Next.js 14, Tailwind CSS, Su
 
 ## Tech stack
 
-- Next.js 14 app router
+- Next.js 16 app router
 - Tailwind CSS
 - Supabase (Auth, Postgres, Storage)
 - Twitter/X OAuth 2.0
